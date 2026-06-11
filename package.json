@@ -55,9 +55,11 @@
     "embla-carousel-react": "^8.3.0",
     "eslint": "8.49.0",
     "eslint-config-next": "13.5.1",
+    "imapflow": "^1.4.0",
     "input-otp": "^1.2.4",
     "jose": "^6.2.3",
     "lucide-react": "^0.446.0",
+    "mailparser": "^3.9.9",
     "mongoose": "^9.6.3",
     "next": "13.5.1",
     "next-themes": "^0.3.0",
@@ -76,5 +78,8 @@
     "typescript": "5.2.2",
     "vaul": "^0.9.9",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/mailparser": "^3.4.6"
   }
 }

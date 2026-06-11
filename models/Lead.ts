@@ -17,6 +17,7 @@ export interface ILead extends Document {
   notes?: string;
   status: LeadStatus;
   source?: string;
+  sourceMessageId?: string;
   followUpDate?: Date;
   lastActivity?: Date;
   assignedTo?: mongoose.Types.ObjectId;
@@ -37,6 +38,7 @@ const LeadSchema = new Schema<ILead>(
       default: 'New',
     },
     source: { type: String, default: 'Manual' },
+    sourceMessageId: { type: String, index: true },
     followUpDate: { type: Date },
     lastActivity: { type: Date, default: Date.now },
     assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },
