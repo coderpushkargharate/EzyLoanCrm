@@ -20,15 +20,34 @@ const cached: MongooseCache = global.mongooseCache ?? { conn: null, promise: nul
 global.mongooseCache = cached;
 
 async function connectDB(): Promise<typeof mongoose> {
-  if (cached.conn) return cached.conn;
+  // Reuse a live connection.
+  if (cached.conn && mongoose.connection.readyState === 1) return cached.conn;
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false,
-    });
+    cached.promise = mongoose
+      .connect(MONGODB_URI, {
+        bufferCommands: false,
+        // Fail fast on transient Atlas "no primary" windows instead of hanging.
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        retryWrites: true,
+      })
+      .catch((err) => {
+        // IMPORTANT: clear the cached promise so the *next* request retries
+        // instead of forever awaiting this same rejected promise.
+        cached.promise = null;
+        throw err;
+      });
   }
 
-  cached.conn = await cached.promise;
+  try {
+    cached.conn = await cached.promise;
+  } catch (err) {
+    cached.promise = null;
+    throw err;
+  }
   return cached.conn;
 }
 

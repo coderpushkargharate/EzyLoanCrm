@@ -121,20 +121,22 @@ export default function NavBar({ userName, userEmail, company = 'ezyloan.co.in' 
                   </div>
                   <div className="py-1">
                     {[
-                      { label: 'Profile', icon: User },
-                      { label: 'Settings', icon: Settings },
-                      { label: 'Subscription', icon: CreditCard },
-                      { label: 'Mobile App', icon: Smartphone },
-                      { label: 'User Guide', icon: BookOpen },
-                      { label: 'Live Chat Support', icon: MessageCircle },
-                    ].map(({ label, icon: Icon }) => (
-                      <button
+                      { label: 'Profile', icon: User, href: '/account?tab=profile' },
+                      { label: 'Settings', icon: Settings, href: '/account?tab=notifications' },
+                      { label: 'Subscription', icon: CreditCard, href: '/account?tab=subscription' },
+                      { label: 'Mobile App', icon: Smartphone, href: '/account' },
+                      { label: 'User Guide', icon: BookOpen, href: '/account' },
+                      { label: 'Live Chat Support', icon: MessageCircle, href: 'https://wa.me/916372977626' },
+                    ].map(({ label, icon: Icon, href }) => (
+                      <Link
                         key={label}
+                        href={href}
+                        onClick={() => setProfileOpen(false)}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition"
                       >
                         <Icon size={15} className="text-gray-400" />
                         {label}
-                      </button>
+                      </Link>
                     ))}
                   </div>
                   <div className="border-t border-gray-100 pt-1">

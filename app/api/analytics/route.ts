@@ -48,6 +48,42 @@ export async function GET(req: NextRequest) {
     { $sort: { count: -1 } },
   ]);
 
+  // Sales funnel grouped by lead source (real replacement for Privyr's "by Location")
+  const sourceFunnel = await Lead.aggregate([
+    {
+      $group: {
+        _id: { $ifNull: ['$source', 'Manual'] },
+        total: { $sum: 1 },
+        interested: { $sum: { $cond: [{ $eq: ['$status', '1. Interested'] }, 1, 0] } },
+        warm: { $sum: { $cond: [{ $in: ['$status', ['Warm', 'No Response']] }, 1, 0] } },
+        converted: { $sum: { $cond: [{ $eq: ['$status', 'Converted'] }, 1, 0] } },
+      },
+    },
+    { $sort: { total: -1 } },
+    { $limit: 8 },
+  ]);
+
+  // Activities grouped by type
+  const activityByType = await Activity.aggregate([
+    { $group: { _id: '$type', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ]);
+
+  // Leads per day for the last 14 days
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 13);
+  twoWeeksAgo.setHours(0, 0, 0, 0);
+  const dailyLeads = await Lead.aggregate([
+    { $match: { createdAt: { $gte: twoWeeksAgo } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
   const totalActivities = await Activity.countDocuments();
 
   return NextResponse.json({
@@ -62,6 +98,9 @@ export async function GET(req: NextRequest) {
     },
     monthlyLeads,
     statusBreakdown,
+    sourceFunnel,
+    activityByType,
+    dailyLeads,
     recentLeads,
   });
 }

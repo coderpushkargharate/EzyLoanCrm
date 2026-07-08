@@ -1,11 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, TrendingUp, UserX, UserCheck, Target, Activity } from 'lucide-react';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
+import { Users, TrendingUp, UserCheck, Target, Activity as ActivityIcon, CalendarDays, LayoutGrid } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface AnalyticsData {
   stats: {
@@ -19,194 +16,200 @@ interface AnalyticsData {
   };
   monthlyLeads: Array<{ _id: { year: number; month: number }; count: number }>;
   statusBreakdown: Array<{ _id: string; count: number }>;
+  sourceFunnel: Array<{ _id: string; total: number; interested: number; warm: number; converted: number }>;
+  activityByType: Array<{ _id: string; count: number }>;
+  dailyLeads: Array<{ _id: string; count: number }>;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const STATUS_COLORS: Record<string, string> = {
-  'New': '#0ea5e9',
-  'No Response': '#f43f5e',
-  'Cold': '#64748b',
-  'Warm': '#f97316',
-  '1. Interested': '#22c55e',
-  '0. Not Interested': '#374151',
-  'Lost': '#ef4444',
-  'Converted': '#10b981',
+const ACTIVITY_META: Record<string, { label: string; color: string }> = {
+  call: { label: 'Call', color: '#eab308' },
+  meeting: { label: 'Meeting', color: '#22c55e' },
+  note: { label: 'Note', color: '#3b82f6' },
+  email: { label: 'Email', color: '#f97316' },
+  status_change: { label: 'Status Change', color: '#a855f7' },
+  created: { label: 'Lead Created', color: '#14b8a6' },
+  follow_up: { label: 'Follow Up', color: '#ec4899' },
 };
+
+/* Dashboard "window" card with the little mac-dots header */
+function Dashboard({ title, icon, pill, children }: { title: string; icon?: string; pill?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-gray-200 shadow-sm bg-white overflow-hidden">
+      <div className="flex items-center gap-1.5 px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+        <span className="w-2.5 h-2.5 rounded-full bg-red-400" />
+        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+        <span className="w-2.5 h-2.5 rounded-full bg-green-400" />
+      </div>
+      <div className="flex items-center justify-between px-5 pt-4">
+        <div className="flex items-center gap-2">
+          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-sm">{icon || '📊'}</span>
+          <h3 className="text-base font-bold text-gray-800">{title}</h3>
+        </div>
+        {pill && <span className="text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">{pill}</span>}
+      </div>
+      <div className="p-5">{children}</div>
+    </div>
+  );
+}
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/analytics')
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
+    fetch('/api/analytics').then((r) => r.json()).then(setData).finally(() => setLoading(false));
   }, []);
-
-  const monthlyData = data?.monthlyLeads.map((d) => ({
-    name: MONTHS[d._id.month - 1],
-    leads: d.count,
-  })) || [];
-
-  const pieData = data?.statusBreakdown.map((d) => ({
-    name: d._id,
-    value: d.count,
-    color: STATUS_COLORS[d._id] || '#94a3b8',
-  })) || [];
-
-  const statCards = data ? [
-    { label: 'Total Leads', value: data.stats.totalLeads, icon: <Users size={20} />, color: 'text-cyan-600 bg-cyan-50' },
-    { label: 'New / Uncontacted', value: data.stats.newLeads, icon: <TrendingUp size={20} />, color: 'text-blue-600 bg-blue-50' },
-    { label: 'Interested', value: data.stats.interestedLeads, icon: <UserCheck size={20} />, color: 'text-green-600 bg-green-50' },
-    { label: 'Converted', value: data.stats.convertedLeads, icon: <Target size={20} />, color: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Lost', value: data.stats.lostLeads, icon: <UserX size={20} />, color: 'text-red-600 bg-red-50' },
-    { label: 'Total Activities', value: data.stats.totalActivities, icon: <Activity size={20} />, color: 'text-teal-600 bg-teal-50' },
-  ] : [];
 
   if (loading) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Analytics</h1>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 bg-white rounded-xl border border-gray-200 animate-pulse" />
-          ))}
+        <h1 className="text-3xl font-bold text-gray-900 mb-6">Advanced Analytics</h1>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 bg-white rounded-2xl border border-gray-200 animate-pulse" />)}
         </div>
       </div>
     );
   }
 
-  const conversionRate = data?.stats.totalLeads
-    ? Math.round((data.stats.convertedLeads / data.stats.totalLeads) * 100)
-    : 0;
+  const stats = data!.stats;
+  const conversionRate = stats.totalLeads ? Math.round((stats.convertedLeads / stats.totalLeads) * 100) : 0;
+
+  const statCards = [
+    { label: 'Total Leads', value: stats.totalLeads, icon: <Users size={18} />, color: 'text-cyan-600 bg-cyan-50' },
+    { label: 'Interested', value: stats.interestedLeads, icon: <UserCheck size={18} />, color: 'text-green-600 bg-green-50' },
+    { label: 'Converted', value: stats.convertedLeads, icon: <Target size={18} />, color: 'text-emerald-600 bg-emerald-50' },
+    { label: 'Activities', value: stats.totalActivities, icon: <ActivityIcon size={18} />, color: 'text-teal-600 bg-teal-50' },
+  ];
+
+  const dailyData = (data!.dailyLeads || []).map((d) => {
+    const dt = new Date(d._id);
+    return { name: dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), leads: d.count };
+  });
+
+  const monthlyData = (data!.monthlyLeads || []).map((d) => ({ name: MONTHS[d._id.month - 1], leads: d.count }));
+  const barData = dailyData.length > 0 ? dailyData : monthlyData;
+
+  const activities = (data!.activityByType || []).map((a) => ({
+    ...a,
+    meta: ACTIVITY_META[a._id] || { label: a._id, color: '#94a3b8' },
+  }));
+  const maxAct = Math.max(1, ...activities.map((a) => a.count));
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-gray-500 text-sm mt-1">Track your sales pipeline performance</p>
+      <div className="flex items-center gap-2 mb-1">
+        <LayoutGrid size={22} className="text-purple-500" />
+        <h1 className="text-3xl font-bold text-gray-900">Advanced Analytics</h1>
       </div>
+      <p className="text-gray-500 text-sm mb-6">Real-time insights into your leads, sales funnel, and activity — {conversionRate}% conversion rate.</p>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        {statCards.map((card) => (
-          <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className={`p-2 rounded-lg ${card.color}`}>{card.icon}</div>
-              <span className="text-xs font-medium text-gray-500">{card.label}</span>
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {statCards.map((c) => (
+          <div key={c.label} className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+            <div className="flex items-center gap-2.5 mb-2">
+              <span className={`p-2 rounded-lg ${c.color}`}>{c.icon}</span>
+              <span className="text-xs font-medium text-gray-500">{c.label}</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{card.value}</p>
+            <p className="text-3xl font-bold text-gray-900">{c.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Conversion Rate */}
-      <div className="bg-gradient-to-r from-cyan-500 to-teal-600 rounded-xl p-6 mb-6 text-white">
-        <p className="text-cyan-100 text-sm font-medium mb-1">Conversion Rate</p>
-        <p className="text-5xl font-bold">{conversionRate}%</p>
-        <p className="text-cyan-100 text-sm mt-1">
-          {data?.stats.convertedLeads} out of {data?.stats.totalLeads} leads converted
-        </p>
+      {/* Sales Funnel by Source */}
+      <div className="mb-6">
+        <Dashboard title="Sales Funnel by Source" icon="🎯" pill="This Year">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-xs font-semibold text-gray-500 pb-2">Source</th>
+                  <th className="text-center text-xs font-semibold text-gray-500 pb-2">Total Leads</th>
+                  <th className="text-center text-xs font-semibold text-gray-500 pb-2">😊 Interested</th>
+                  <th className="text-center text-xs font-semibold text-gray-500 pb-2">🔥 Warm</th>
+                  <th className="text-center text-xs font-semibold text-gray-500 pb-2">✅ Converted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data!.sourceFunnel.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center text-gray-400 text-sm py-8">No leads yet</td></tr>
+                ) : (
+                  data!.sourceFunnel.map((row) => (
+                    <tr key={row._id} className="border-b border-gray-50 last:border-0">
+                      <td className="py-2.5 text-sm font-medium text-gray-800">{row._id}</td>
+                      <td className="py-2.5 text-sm text-center font-semibold text-gray-900">{row.total}</td>
+                      <td className="py-2.5 text-sm text-center text-gray-600">{row.interested}</td>
+                      <td className="py-2.5 text-sm text-center text-gray-600">{row.warm}</td>
+                      <td className="py-2.5 text-sm text-center text-gray-600">{row.converted}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Dashboard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Bar Chart */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Monthly Leads</h3>
-          {monthlyData.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-              No data for the last 6 months
-            </div>
+        {/* Activities by Type */}
+        <Dashboard title="Activities by Type" icon="⚡" pill="All Team Members">
+          {activities.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">No activities yet</div>
           ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: 12 }}
-                />
-                <Bar dataKey="leads" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+            <div className="space-y-3 py-2">
+              {activities.map((a) => (
+                <div key={a._id} className="flex items-center gap-3">
+                  <span className="w-28 text-xs text-gray-600 flex-shrink-0">{a.meta.label}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                    <div className="h-full rounded-full flex items-center justify-end pr-2" style={{ width: `${(a.count / maxAct) * 100}%`, background: a.meta.color, minWidth: 24 }}>
+                      <span className="text-[10px] font-bold text-white">{a.count}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="flex flex-wrap gap-3 pt-3 border-t border-gray-100 mt-3">
+                {activities.map((a) => (
+                  <span key={a._id} className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: a.meta.color }} /> {a.meta.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </Dashboard>
+
+        {/* Leads by Date Range */}
+        <Dashboard title="Leads by Date Range" icon="📅" pill="All Leads">
+          {barData.length === 0 ? (
+            <div className="h-52 flex items-center justify-center text-gray-400 text-sm">No leads in this range</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={barData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} cursor={{ fill: '#f8fafc' }} />
+                <Bar dataKey="leads" radius={[4, 4, 0, 0]}>
+                  {barData.map((_, i) => <Cell key={i} fill="#38bdf8" />)}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
-        </div>
-
-        {/* Status Pie Chart */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Lead Status Breakdown</h3>
-          {pieData.length === 0 ? (
-            <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
-              No leads yet
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: 12 }}
-                />
-                <Legend
-                  formatter={(value) => <span style={{ fontSize: 11, color: '#64748b' }}>{value}</span>}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+        </Dashboard>
       </div>
 
-      {/* Status table */}
-      {data && data.statusBreakdown.length > 0 && (
-        <div className="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">Status Summary</h3>
-          </div>
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Count</th>
-                <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">%</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {data.statusBreakdown.map((row) => (
-                <tr key={row._id} className="hover:bg-gray-50/50">
-                  <td className="px-6 py-3">
-                    <span
-                      className="inline-block px-2 py-0.5 rounded text-xs font-semibold"
-                      style={{
-                        background: STATUS_COLORS[row._id] + '20',
-                        color: STATUS_COLORS[row._id] || '#64748b',
-                      }}
-                    >
-                      {row._id}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-right text-sm font-semibold text-gray-900">{row.count}</td>
-                  <td className="px-6 py-3 text-right text-sm text-gray-500">
-                    {data.stats.totalLeads ? Math.round((row.count / data.stats.totalLeads) * 100) : 0}%
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Conversion banner */}
+      <div className="mt-6 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl p-6 text-white flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-cyan-50 text-sm font-medium flex items-center gap-1.5"><TrendingUp size={15} /> Conversion Rate</p>
+          <p className="text-5xl font-bold mt-1">{conversionRate}%</p>
         </div>
-      )}
+        <p className="text-cyan-50 text-sm max-w-xs">
+          {stats.convertedLeads} of {stats.totalLeads} leads converted • {stats.interestedLeads} currently interested • {stats.newLeads} uncontacted.
+        </p>
+      </div>
     </div>
   );
 }
