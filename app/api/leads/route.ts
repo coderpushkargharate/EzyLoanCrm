@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
+  const group = searchParams.get('group') || '';
   const tab = searchParams.get('tab') || 'all';
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
@@ -30,6 +31,8 @@ export async function GET(req: NextRequest) {
   }
 
   if (status) query.status = status;
+
+  if (group) query.groups = group;
 
   if (tab === 'uncontacted') {
     query.status = 'New';

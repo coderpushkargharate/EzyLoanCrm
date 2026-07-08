@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { GROUPS, groupStyle } from '@/lib/groups';
+import { cn } from '@/lib/utils';
 // hello
 const STATUS_OPTIONS = [
   'New',
@@ -12,6 +14,7 @@ const STATUS_OPTIONS = [
   '0. Not Interested',
   'Lost',
   'Converted',
+  'Out Of Odisha',
 ];
 
 const SOURCE_OPTIONS = [
@@ -32,12 +35,15 @@ interface Props {
 export default function AddClientModal({ onClose, onSaved }: Props) {
   const [form, setForm] = useState({
     name: '',
+    displayName: '',
     phone: '',
+    whatsapp: '',
     email: '',
     notes: '',
     status: 'New',
     source: 'Manual',
     followUpDate: '',
+    groups: [] as string[],
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,13 +52,22 @@ export default function AddClientModal({ onClose, onSaved }: Props) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function toggleGroup(group: string) {
+    setForm((prev) => ({
+      ...prev,
+      groups: prev.groups.includes(group)
+        ? prev.groups.filter((g) => g !== group)
+        : [...prev.groups, group],
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) { setError('Name is required'); return; }
     setLoading(true);
     setError('');
 
-    const body: Record<string, string> = { ...form };
+    const body: Record<string, unknown> = { ...form };
     if (!body.followUpDate) delete body.followUpDate;
 
     const res = await fetch('/api/leads', {
@@ -90,33 +105,60 @@ export default function AddClientModal({ onClose, onSaved }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Full Name *
+                Client Name *
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                placeholder="John Doe"
+                placeholder="e.g. Katherine Lim"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
             </div>
 
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={form.displayName}
+                onChange={(e) => update('displayName', e.target.value)}
+                placeholder="e.g. Katherine"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Display name is what your clients will see.</p>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Phone
+                Mobile Number
               </label>
               <input
                 type="tel"
                 value={form.phone}
                 onChange={(e) => update('phone', e.target.value)}
-                placeholder="+91 98765 43210"
+                placeholder="+91 08123 456 89"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
-                Email
+                WhatsApp Number
+              </label>
+              <input
+                type="tel"
+                value={form.whatsapp}
+                onChange={(e) => update('whatsapp', e.target.value)}
+                placeholder="+91 08123 456 89"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                Email Address
               </label>
               <input
                 type="email"
@@ -176,6 +218,32 @@ export default function AddClientModal({ onClose, onSaved }: Props) {
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
               />
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                Groups
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {GROUPS.map((g) => {
+                  const active = form.groups.includes(g);
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => toggleGroup(g)}
+                      className={cn(
+                        'px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap border transition',
+                        active
+                          ? groupStyle(g) + ' border-transparent'
+                          : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                      )}
+                    >
+                      {g}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

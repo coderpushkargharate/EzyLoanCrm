@@ -9,6 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
   '0. Not Interested': 'bg-gray-800 text-white',
   'Lost': 'bg-red-500 text-white',
   'Converted': 'bg-emerald-500 text-white',
+  'Out Of Odisha': 'bg-purple-100 text-purple-700',
 };
 
 export default function StatusBadge({ status }: { status: string }) {

@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react';
 import { X, Phone, Mail, Trash2, Save, Calendar, Tag, MessageSquare } from 'lucide-react';
 import StatusBadge from './StatusBadge';
+import GroupBadge from './GroupBadge';
+import { GROUPS, groupStyle } from '@/lib/groups';
+import { cn } from '@/lib/utils';
 import type { Lead } from '@/app/(crm)/clients/page';
 
 const STATUS_OPTIONS = [
   'New', 'No Response', 'Cold', 'Warm',
-  '1. Interested', '0. Not Interested', 'Lost', 'Converted',
+  '1. Interested', '0. Not Interested', 'Lost', 'Converted', 'Out Of Odisha',
 ];
 
 interface Activity {
@@ -61,6 +64,16 @@ export default function ClientDrawer({ lead, onClose, onUpdated, onDeleted }: Pr
     setSaving(false);
   }
 
+  function toggleGroup(group: string) {
+    setForm((p) => {
+      const current = p.groups || [];
+      const next = current.includes(group)
+        ? current.filter((g) => g !== group)
+        : [...current, group];
+      return { ...p, groups: next };
+    });
+  }
+
   async function handleDelete() {
     if (!confirm('Delete this client? This cannot be undone.')) return;
     await fetch(`/api/leads/${lead._id}`, { method: 'DELETE' });
@@ -104,6 +117,13 @@ export default function ClientDrawer({ lead, onClose, onUpdated, onDeleted }: Pr
               <StatusBadge status={lead.status} />
               <span className="text-xs text-gray-400">{lead.source}</span>
             </div>
+            {lead.groups && lead.groups.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {lead.groups.map((g) => (
+                  <GroupBadge key={g} group={g} />
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -234,6 +254,29 @@ export default function ClientDrawer({ lead, onClose, onUpdated, onDeleted }: Pr
                       rows={3}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
                     />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Groups</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {GROUPS.map((g) => {
+                        const active = (form.groups || []).includes(g);
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => toggleGroup(g)}
+                            className={cn(
+                              'px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap border transition',
+                              active
+                                ? groupStyle(g) + ' border-transparent'
+                                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                            )}
+                          >
+                            {g}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               ) : (

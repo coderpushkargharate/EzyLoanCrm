@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Plus,
   Filter,
   ChevronRight,
+  ChevronLeft,
   Calendar,
   Trash2,
   X,
@@ -16,17 +18,23 @@ import {
   Square,
 } from 'lucide-react';
 import StatusBadge from '@/components/crm/StatusBadge';
+import GroupBadge from '@/components/crm/GroupBadge';
 import AddClientModal from '@/components/crm/AddClientModal';
-import ClientDrawer from '@/components/crm/ClientDrawer';
+import { GROUPS } from '@/lib/groups';
 
 export interface Lead {
   _id: string;
   name: string;
+  displayName?: string;
   phone?: string;
+  whatsapp?: string;
   email?: string;
   notes?: string;
   status: string;
+  groups?: string[];
   source?: string;
+  opportunitySize?: string;
+  leadStage?: string;
   followUpDate?: string;
   lastActivity?: string;
   createdAt: string;
@@ -36,6 +44,7 @@ const TABS = [
   { key: 'all', label: 'All Clients' },
   { key: 'uncontacted', label: 'Uncontacted' },
   { key: 'followups', label: 'Follow Ups' },
+  { key: 'recent', label: 'Recently Viewed Content' },
 ];
 
 const STATUS_OPTIONS = [
@@ -48,39 +57,74 @@ const STATUS_OPTIONS = [
   '0. Not Interested',
   'Lost',
   'Converted',
+  'Out Of Odisha',
 ];
+
+// Build a compact list of page numbers with ellipses, e.g. [1, '...', 4, 5, 6, '...', 20]
+function getPageRange(current: number, total: number): (number | string)[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const range: (number | string)[] = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) range.push('...');
+  for (let i = start; i <= end; i++) range.push(i);
+  if (end < total - 1) range.push('...');
+  range.push(total);
+  return range;
+}
 
 export default function ClientsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [groupFilter, setGroupFilter] = useState('All Groups');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [showFilter, setShowFilter] = useState(false);
+  const router = useRouter();
+
+  function openLead(id: string) {
+    router.push(`/clients/${id}`);
+  }
 
   const fetchLeads = useCallback(async () => {
+    if (activeTab === 'recent') {
+      setLeads([]);
+      setTotal(0);
+      setPages(1);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const params = new URLSearchParams({ tab: activeTab });
+    const params = new URLSearchParams({ tab: activeTab, page: String(page) });
     if (search) params.set('search', search);
     if (statusFilter !== 'All Statuses') params.set('status', statusFilter);
+    if (groupFilter !== 'All Groups') params.set('group', groupFilter);
 
     const res = await fetch(`/api/leads?${params}`);
     if (res.ok) {
       const data = await res.json();
       setLeads(data.leads);
       setTotal(data.total);
+      setPages(data.pages || 1);
     }
     setLoading(false);
-  }, [activeTab, search, statusFilter]);
+  }, [activeTab, search, statusFilter, groupFilter, page]);
 
   useEffect(() => {
     const timer = setTimeout(fetchLeads, 300);
     return () => clearTimeout(timer);
   }, [fetchLeads]);
+
+  // Reset to page 1 whenever the filters/tab/search change
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, search, statusFilter, groupFilter]);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -169,15 +213,27 @@ export default function ClientsPage() {
             </button>
 
             {showFilter && (
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <select
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="All Groups">All Groups</option>
+                  {GROUPS.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </>
             )}
 
             {selectedIds.size > 0 && (
@@ -212,6 +268,7 @@ export default function ClientsPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Phone Number</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Notes</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Groups</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Follow Up</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Last Activity</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">Date Added</th>
@@ -221,15 +278,17 @@ export default function ClientsPage() {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i} className="border-b border-gray-50">
-                    <td colSpan={8} className="px-4 py-3">
+                    <td colSpan={9} className="px-4 py-3">
                       <div className="h-4 bg-gray-100 rounded animate-pulse" />
                     </td>
                   </tr>
                 ))
               ) : leads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-gray-400 text-sm">
-                    No clients found. Add your first client!
+                  <td colSpan={9} className="px-4 py-16 text-center text-gray-400 text-sm">
+                    {activeTab === 'recent'
+                      ? 'No recently viewed content yet. Content shared with clients will appear here.'
+                      : 'No clients found. Add your first client!'}
                   </td>
                 </tr>
               ) : (
@@ -249,7 +308,7 @@ export default function ClientsPage() {
                         )}
                       </button>
                     </td>
-                    <td className="px-4 py-3" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3" onClick={() => openLead(lead._id)}>
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold text-gray-900 hover:text-cyan-600 transition">
                           {lead.name}
@@ -260,18 +319,29 @@ export default function ClientsPage() {
                         {lead.phone && <span className="text-xs text-gray-500">{lead.phone}</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell" onClick={() => openLead(lead._id)}>
                       {lead.phone || '-'}
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 hidden md:table-cell" onClick={() => openLead(lead._id)}>
                       <span className="text-xs text-gray-500 line-clamp-1 max-w-[200px]">
                         {lead.notes || '-'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 hidden lg:table-cell" onClick={() => openLead(lead._id)}>
                       <StatusBadge status={lead.status} />
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-500" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 hidden lg:table-cell" onClick={() => openLead(lead._id)}>
+                      {lead.groups && lead.groups.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {lead.groups.map((g) => (
+                            <GroupBadge key={g} group={g} />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-300 text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-sm text-gray-500" onClick={() => openLead(lead._id)}>
                       {lead.followUpDate ? (
                         <span className="flex items-center gap-1">
                           <Calendar size={12} />
@@ -281,10 +351,10 @@ export default function ClientsPage() {
                         '-'
                       )}
                     </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-sm text-gray-500" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 hidden xl:table-cell text-sm text-gray-500" onClick={() => openLead(lead._id)}>
                       {formatDate(lead.lastActivity)}
                     </td>
-                    <td className="px-4 py-3 hidden xl:table-cell text-sm text-gray-500" onClick={() => setActiveLead(lead)}>
+                    <td className="px-4 py-3 hidden xl:table-cell text-sm text-gray-500" onClick={() => openLead(lead._id)}>
                       {formatDate(lead.createdAt)}
                     </td>
                   </tr>
@@ -293,6 +363,45 @@ export default function ClientsPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {!loading && activeTab !== 'recent' && pages > 1 && (
+          <div className="flex items-center justify-center gap-1.5 py-5 border-t border-gray-100">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition"
+              aria-label="Previous page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {getPageRange(page, pages).map((p, i) =>
+              p === '...' ? (
+                <span key={`e${i}`} className="w-8 text-center text-gray-400 text-sm select-none">…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p as number)}
+                  className={`min-w-8 h-8 px-2 flex items-center justify-center rounded-full text-sm font-medium transition ${
+                    page === p
+                      ? 'bg-cyan-50 text-cyan-600 ring-1 ring-cyan-200'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              onClick={() => setPage((p) => Math.min(pages, p + 1))}
+              disabled={page === pages}
+              className="w-8 h-8 flex items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition"
+              aria-label="Next page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
@@ -300,21 +409,6 @@ export default function ClientsPage() {
         <AddClientModal
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); fetchLeads(); }}
-        />
-      )}
-
-      {activeLead && (
-        <ClientDrawer
-          lead={activeLead}
-          onClose={() => setActiveLead(null)}
-          onUpdated={(updated) => {
-            setLeads((prev) => prev.map((l) => (l._id === updated._id ? updated : l)));
-            setActiveLead(updated);
-          }}
-          onDeleted={() => {
-            setLeads((prev) => prev.filter((l) => l._id !== activeLead._id));
-            setActiveLead(null);
-          }}
         />
       )}
     </div>

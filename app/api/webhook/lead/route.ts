@@ -6,6 +6,14 @@ import { sendLeadNotification } from '@/lib/email';
 
 export async function POST(req: NextRequest) {
   try {
+    // Optional shared-secret check. If LEAD_WEBHOOK_SECRET is configured, the
+    // caller (EzyLoan website) must send a matching `x-webhook-secret` header.
+    // Left unset = open webhook, so existing integrations keep working.
+    const expectedSecret = process.env.LEAD_WEBHOOK_SECRET;
+    if (expectedSecret && req.headers.get('x-webhook-secret') !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     await connectDB();
     const body = await req.json();
 
