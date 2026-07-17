@@ -23,11 +23,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
+    const inquiryNote = message
+      ? `Website Inquiry: ${message}`
+      : `Lead via ${source || 'Ezy Loan Website'}`;
+
+    // Dedup: the same customer often submits more than once (contact form +
+    // Apply Now, or a repeat enquiry). Instead of piling up duplicate cards we
+    // match an EXISTING lead by phone (fallback email) and fold the new enquiry
+    // into it — append to notes, log an activity, bump lastActivity. Only when
+    // no match exists do we create a fresh lead. Matching identifiers are
+    // trimmed and case-insensitive (email) so "  9876..." == "9876..." etc.
+    const identifierMatch: Record<string, unknown>[] = [];
+    const trimmedPhone = typeof phone === 'string' ? phone.trim() : '';
+    const trimmedEmail = typeof email === 'string' ? email.trim() : '';
+    if (trimmedPhone) identifierMatch.push({ phone: trimmedPhone });
+    if (trimmedEmail) {
+      identifierMatch.push({ email: trimmedEmail.toLowerCase() });
+    }
+
+    const existing = identifierMatch.length
+      ? await Lead.findOne({ $or: identifierMatch }).sort({ createdAt: -1 })
+      : null;
+
+    if (existing) {
+      // Fold the repeat enquiry into the known lead — never overwrite the
+      // human-managed status/assignment, just enrich it.
+      const stamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+      existing.notes = `${existing.notes ? existing.notes + '\n\n' : ''}[${stamp}] ${inquiryNote}`;
+      existing.lastActivity = new Date();
+      // Backfill contact fields the original lead may have been missing.
+      if (!existing.email && trimmedEmail) existing.email = trimmedEmail;
+      if (!existing.phone && trimmedPhone) existing.phone = trimmedPhone;
+      await existing.save();
+
+      await Activity.create({
+        leadId: existing._id,
+        type: 'note',
+        description: `Repeat enquiry from ${source || 'Website Form'}${message ? `: ${message}` : ''}`,
+      });
+
+      // Still notify — a returning lead is a hot signal (non-blocking).
+      sendLeadNotification({ name, email, phone, message, source }).catch(console.error);
+
+      return NextResponse.json(
+        { success: true, leadId: existing._id, deduped: true },
+        { status: 200 },
+      );
+    }
+
     const lead = await Lead.create({
       name,
-      email: email || undefined,
-      phone: phone || undefined,
-      notes: message ? `Website Inquiry: ${message}` : 'Facebook Lead via Ezy Loan',
+      email: trimmedEmail || undefined,
+      phone: trimmedPhone || undefined,
+      // A loan CRM messages leads on WhatsApp — seed it from the phone so the
+      // WhatsApp column is populated out of the box (still editable in the CRM).
+      whatsapp: trimmedPhone || undefined,
+      notes: inquiryNote,
       source: source || 'Website Form',
       status: 'New',
     });
